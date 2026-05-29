@@ -132,3 +132,5 @@ dist
 # Claude
 .claude/
 CLAUDE.md
+
+recursos/fontes/beecrowd/*
