@@ -134,3 +134,5 @@ dist
 CLAUDE.md
 
 recursos/fontes/beecrowd/*
+!recursos/fontes/beecrowd/relatorios/
+!recursos/fontes/beecrowd/relatorios/*.csv

@@ -21,6 +21,7 @@
         "executar-potigol": "NODE_NO_WARNINGS=1 ts-node --project tsconfig.test.json scripts/executar-potigol.ts",
         "executar-potigol:silencioso": "NODE_NO_WARNINGS=1 yarn -s executar-potigol",
         "testar-beecrowd": "NODE_NO_WARNINGS=1 ts-node --project tsconfig.test.json scripts/testar-beecrowd.ts",
+        "testar-beecrowd:csv": "NODE_NO_WARNINGS=1 ts-node --project tsconfig.test.json scripts/gerar-relatorio-beecrowd-csv.ts",
         "observar-testes-unitarios": "yarn jest --watchAll",
         "observar-testes-unitarios-com-coverage": "yarn jest --coverage --watchAll",
         "lint": "yarn eslint . --ext .ts",

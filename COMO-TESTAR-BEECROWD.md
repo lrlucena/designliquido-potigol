@@ -129,7 +129,44 @@ Combinar opcoes:
 NODE_NO_WARNINGS=1 yarn -s testar-beecrowd recursos/fontes/beecrowd/src/1000 --limite=20 --json
 ```
 
-## 7. Saida e codigos de retorno
+## 7. Gerar CSV para versionar no GitHub
+
+Depois de gerar o JSON, converta para CSV:
+
+```bash
+NODE_NO_WARNINGS=1 yarn -s testar-beecrowd:csv
+```
+
+Esse comando le, por padrao, `recursos/fontes/beecrowd/relatorios/resultado.json`
+e gera:
+
+- `recursos/fontes/beecrowd/relatorios/resultado-resumo.csv`
+- `recursos/fontes/beecrowd/relatorios/resultado-falhas.csv`
+- `recursos/fontes/beecrowd/relatorios/historico-resumo.csv`
+
+O arquivo `historico-resumo.csv` recebe uma nova linha por execucao, com data,
+versao, totais e taxa de aprovacao, permitindo acompanhar a evolucao entre execucoes.
+
+No `resultado-falhas.csv`, os campos de texto sao truncados para facilitar diff no GitHub:
+
+- `esperado`: 30 caracteres
+- `recebido`: 30 caracteres
+- `stderr`: 100 caracteres
+
+Opcoes uteis:
+
+```bash
+# JSON de entrada customizado
+NODE_NO_WARNINGS=1 yarn -s testar-beecrowd:csv recursos/fontes/beecrowd/relatorios/resultado_1100.json
+
+# diretorio de saida customizado
+NODE_NO_WARNINGS=1 yarn -s testar-beecrowd:csv --saida-dir=recursos/fontes/beecrowd/relatorios/csv
+
+# caminho customizado para o historico
+NODE_NO_WARNINGS=1 yarn -s testar-beecrowd:csv --historico=recursos/fontes/beecrowd/relatorios/csv/historico.csv
+```
+
+## 8. Saida e codigos de retorno
 
 Ao final, o script mostra:
 
@@ -151,7 +188,7 @@ Codigo de retorno do processo:
 - `0`: todos os casos passaram;
 - `1`: houve falha em pelo menos um caso, erro de diretorio invalido, ou erro de execucao.
 
-## 8. Observacoes
+## 9. Observacoes
 
 - Cada caso tem timeout de 10 segundos.
 - O progresso e exibido a cada 25 casos executados.
