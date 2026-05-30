@@ -1,15 +1,18 @@
 import {
+    AcessoIndiceVariavel,
     AcessoMetodoOuPropriedade,
     Agrupamento,
     Chamada,
     Constante,
+    FuncaoConstruto,
     Literal,
     Tupla,
+    Variavel,
 } from '@designliquido/delegua/construtos';
-import { Declaracao } from '@designliquido/delegua/declaracoes';
+import { Declaracao, Retorna } from '@designliquido/delegua/declaracoes';
 import { MicroAvaliadorSintaticoBase } from '@designliquido/delegua/avaliador-sintatico/micro-avaliador-sintatico-base';
 import { SeletorTuplas } from '@designliquido/delegua/construtos/tuplas';
-import { ConstrutoInterface, RetornoAvaliadorSintaticoInterface, RetornoLexadorInterface, SimboloInterface } from '@designliquido/delegua/interfaces';
+import { ConstrutoInterface, ParametroInterface, RetornoAvaliadorSintaticoInterface, RetornoLexadorInterface, SimboloInterface } from '@designliquido/delegua/interfaces';
 import { Simbolo } from '@designliquido/delegua/lexador';
 
 import tiposDeSimbolos from '../tipos-de-simbolos/micro-lexico';
@@ -114,19 +117,62 @@ export class MicroAvaliadorSintaticoPotigol extends MicroAvaliadorSintaticoBase 
     chamar(): ConstrutoInterface {
         let expressao = this.formato();
 
-        if (expressao && this.verificarSeSimboloAtualEIgualA(tiposDeSimbolos.PARENTESE_ESQUERDO)) {
-            const argumentos: ConstrutoInterface[] = [];
-            if (!this.verificarTipoSimboloAtual(tiposDeSimbolos.PARENTESE_DIREITO)) {
-                argumentos.push(this.ou());
-                while (this.verificarSeSimboloAtualEIgualA(tiposDeSimbolos.VIRGULA)) {
+        while (expressao) {
+            if (this.verificarSeSimboloAtualEIgualA(tiposDeSimbolos.PARENTESE_ESQUERDO)) {
+                const argumentos: ConstrutoInterface[] = [];
+                if (!this.verificarTipoSimboloAtual(tiposDeSimbolos.PARENTESE_DIREITO)) {
                     argumentos.push(this.ou());
+                    while (this.verificarSeSimboloAtualEIgualA(tiposDeSimbolos.VIRGULA)) {
+                        argumentos.push(this.ou());
+                    }
                 }
+                this.consumir(tiposDeSimbolos.PARENTESE_DIREITO, "Esperado ')' após argumentos.");
+                expressao = new Chamada(this.hashArquivo, expressao, argumentos);
+            } else if (this.verificarSeSimboloAtualEIgualA(tiposDeSimbolos.COLCHETE_ESQUERDO)) {
+                const indice = this.ou();
+                const simboloFechamento = this.consumir(
+                    tiposDeSimbolos.COLCHETE_DIREITO,
+                    "Esperado ']' após escrita do índice."
+                );
+                const variavelVetor = new Variavel(expressao.hashArquivo, (expressao as any).simbolo);
+                expressao = new AcessoIndiceVariavel(this.hashArquivo, variavelVetor, indice, simboloFechamento);
+            } else if (this.verificarSeSimboloAtualEIgualA(tiposDeSimbolos.PONTO)) {
+                const nome = this.consumir(tiposDeSimbolos.IDENTIFICADOR, "Esperado nome do método após '.'.");
+                const objeto = (expressao as any).simbolo
+                    ? new Variavel(expressao.hashArquivo, (expressao as any).simbolo)
+                    : expressao;
+                expressao = new AcessoMetodoOuPropriedade(this.hashArquivo, objeto, nome);
+            } else {
+                break;
             }
-            this.consumir(tiposDeSimbolos.PARENTESE_DIREITO, "Esperado ')' após argumentos.");
-            expressao = new Chamada(this.hashArquivo, expressao, argumentos);
         }
 
         return expressao;
+    }
+
+    declaracao(): ConstrutoInterface {
+        // Detecta lambda de parâmetro único sem tipo: `identificador => expr`
+        if (
+            this.simbolos[this.atual]?.tipo === tiposDeSimbolos.IDENTIFICADOR &&
+            this.simbolos[this.atual + 1]?.tipo === tiposDeSimbolos.SETA
+        ) {
+            const paramSimbolo = this.avancarEDevolverAnterior();
+            this.avancarEDevolverAnterior(); // consome =>
+            const corpo = this.ou();
+            const parametros: ParametroInterface[] = [{
+                abrangencia: 'padrao',
+                nome: paramSimbolo,
+                tipoDado: 'qualquer',
+            } as ParametroInterface];
+            return new FuncaoConstruto(
+                this.hashArquivo,
+                Number(paramSimbolo.linha),
+                parametros,
+                [new Retorna(paramSimbolo as any, corpo as any)]
+            );
+        }
+
+        return this.ou();
     }
 
     analisar(retornoLexador: RetornoLexadorInterface<SimboloInterface>, linha: number): RetornoAvaliadorSintaticoInterface<Declaracao> {
@@ -138,7 +184,7 @@ export class MicroAvaliadorSintaticoPotigol extends MicroAvaliadorSintaticoBase 
 
         this.declaracoes = [];
         while (this.atual < this.simbolos.length) {
-            this.declaracoes.push(this.declaracao() as Declaracao);
+            this.declaracoes.push(this.declaracao() as unknown as Declaracao);
         }
 
         return {
