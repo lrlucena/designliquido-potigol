@@ -56,7 +56,7 @@ import {
     LeiaTexto,
     LeiaTextos,
 } from '../construtos';
-import { AliasTipo, AtribuicaoParalelaVariavel, ParaGere, ReatribuicaoVariavel } from '../declaracoes';
+import { AliasTipo, AtribuicaoParalelaVariavel, ParaEmGere, ParaGere, ReatribuicaoVariavel } from '../declaracoes';
 import { FaixaEmInterface } from '../interfaces';
 import { MicroAvaliadorSintaticoPotigol } from './micro-avaliador-sintatico-potigol';
 import { PilhaEscoposVariaveisConhecidas } from './pilha-escopos-variaveis-conhecidas';
@@ -1092,9 +1092,14 @@ export class AvaliadorSintaticoPotigol extends AvaliadorSintaticoBase {
 
         this.consumir(tiposDeSimbolos.ENTAO, "Esperado palavra reservada 'entao' após condição em declaração 'se'.");
 
-        const declaracoes = [];
+        let declaracoes = [];
         do {
-            declaracoes.push(await this.resolverDeclaracaoForaDeBloco());
+            const retornoDeclaracao = await this.resolverDeclaracaoForaDeBloco();
+            if (Array.isArray(retornoDeclaracao)) {
+                declaracoes = declaracoes.concat(retornoDeclaracao);
+            } else if (retornoDeclaracao) {
+                declaracoes.push(retornoDeclaracao);
+            }
         } while (![tiposDeSimbolos.SENAO, tiposDeSimbolos.SENAOSE, tiposDeSimbolos.FIM].includes(this.simbolos[this.atual].tipo));
 
         let caminhoSenao = null;
@@ -1109,16 +1114,21 @@ export class AvaliadorSintaticoPotigol extends AvaliadorSintaticoBase {
                 consumirFimExterno = false;
             } else {
                 const simboloSenao = this.simbolos[this.atual - 1];
-                const declaracoesSenao = [];
+                let declaracoesSenao = [];
 
                 do {
-                    declaracoesSenao.push(await this.resolverDeclaracaoForaDeBloco());
+                    const retornoDeclaracaoSenao = await this.resolverDeclaracaoForaDeBloco();
+                    if (Array.isArray(retornoDeclaracaoSenao)) {
+                        declaracoesSenao = declaracoesSenao.concat(retornoDeclaracaoSenao);
+                    } else if (retornoDeclaracaoSenao) {
+                        declaracoesSenao.push(retornoDeclaracaoSenao);
+                    }
                 } while (![tiposDeSimbolos.FIM].includes(this.simbolos[this.atual].tipo));
 
                 caminhoSenao = new Bloco(
                     this.hashArquivo,
                     Number(simboloSenao.linha),
-                    declaracoesSenao.filter((d) => d)
+                    declaracoesSenao
                 );
             }
         }
@@ -1132,7 +1142,7 @@ export class AvaliadorSintaticoPotigol extends AvaliadorSintaticoBase {
             new Bloco(
                 this.hashArquivo,
                 Number(simboloSe.linha),
-                declaracoes.filter((d) => d)
+                declaracoes
             ),
             [],
             caminhoSenao
@@ -1149,9 +1159,14 @@ export class AvaliadorSintaticoPotigol extends AvaliadorSintaticoBase {
             "Esperado paravra reservada 'faca' após condição de continuidade em declaracão 'enquanto'."
         );
 
-        const declaracoes = [];
+        let declaracoes = [];
         do {
-            declaracoes.push(await this.resolverDeclaracaoForaDeBloco());
+            const retornoDeclaracao = await this.resolverDeclaracaoForaDeBloco();
+            if (Array.isArray(retornoDeclaracao)) {
+                declaracoes = declaracoes.concat(retornoDeclaracao);
+            } else if (retornoDeclaracao) {
+                declaracoes.push(retornoDeclaracao);
+            }
         } while (![tiposDeSimbolos.FIM].includes(this.simbolos[this.atual].tipo));
 
         this.consumir(tiposDeSimbolos.FIM, "Esperado palavra-chave 'fim' para fechamento de declaração 'enquanto'.");
@@ -1161,7 +1176,7 @@ export class AvaliadorSintaticoPotigol extends AvaliadorSintaticoBase {
             new Bloco(
                 simboloAtual.hashArquivo,
                 Number(simboloAtual.linha),
-                declaracoes.filter((d) => d)
+                declaracoes
             )
         );
     }
@@ -1364,9 +1379,75 @@ export class AvaliadorSintaticoPotigol extends AvaliadorSintaticoBase {
                 faixasEm.push({ variavel: varAdicional, colecao: colecaoAdicional });
             }
 
+            let condicaoEmGere: ConstrutoInterface = undefined;
+            if (this.verificarSeSimboloAtualEIgualA(tiposDeSimbolos.SE)) {
+                condicaoEmGere = await this.expressao();
+            }
+
+            if (this.verificarSeSimboloAtualEIgualA(tiposDeSimbolos.GERE)) {
+                const declaracoesGere = [];
+                let simboloAtualGere: SimboloInterface = this.simbolos[this.atual];
+                while (simboloAtualGere.tipo !== tiposDeSimbolos.FIM) {
+                    declaracoesGere.push(await this.resolverDeclaracaoForaDeBloco());
+                    simboloAtualGere = this.simbolos[this.atual];
+                }
+                this.consumir(tiposDeSimbolos.FIM, "Esperado 'fim' após bloco de 'gere'.");
+
+                const corpoGere = declaracoesGere.filter((d) => d);
+
+                if (faixasEm.length === 0) {
+                    return new ParaEmGere(
+                        this.hashArquivo,
+                        Number(simboloPara.linha),
+                        variavelIteracao,
+                        colecao,
+                        corpoGere,
+                        condicaoEmGere
+                    ) as unknown as Para;
+                }
+
+                // Constrói ParaEmGere aninhados de dentro para fora.
+                const ultimaFaixaGere = faixasEm[faixasEm.length - 1];
+                let gereEm: Para = new ParaEmGere(
+                    this.hashArquivo,
+                    Number(simboloPara.linha),
+                    ultimaFaixaGere.variavel,
+                    ultimaFaixaGere.colecao,
+                    corpoGere,
+                    condicaoEmGere
+                ) as unknown as Para;
+
+                const faixasExternasGere: FaixaEmInterface[] = [
+                    { variavel: variavelIteracao, colecao },
+                    ...faixasEm.slice(0, -1)
+                ];
+                for (let i = faixasExternasGere.length - 1; i >= 0; i--) {
+                    const faixa = faixasExternasGere[i];
+                    const gereExterno = new ParaEmGere(
+                        this.hashArquivo,
+                        Number(simboloPara.linha),
+                        faixa.variavel,
+                        faixa.colecao,
+                        [gereEm],
+                        undefined
+                    ) as unknown as Para;
+                    (gereExterno as unknown as ParaEmGere).aplanar = true;
+                    gereEm = gereExterno;
+                }
+
+                return gereEm;
+            }
+
+            if (condicaoEmGere) {
+                throw this.erro(
+                    this.simbolos[this.atual] || this.simboloAnterior(),
+                    "A guarda 'se' em laço 'para ... em' só é suportada com a forma 'gere' neste dialeto."
+                );
+            }
+
             this.consumir(
                 tiposDeSimbolos.FACA,
-                "Esperado palavra reservada 'faca' após coleção em laço 'para ... em'."
+                "Esperado palavra reservada 'faca' ou 'gere' após coleção em laço 'para ... em'."
             );
 
             const declaracoesBloco = [];
