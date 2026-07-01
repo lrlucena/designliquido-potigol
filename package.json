@@ -1,7 +1,7 @@
 {
     "name": "@designliquido/potigol",
     "description": "Dialeto de Potigol baseado em Delégua e TypeScript",
-    "version": "0.11.13",
+    "version": "0.11.14",
     "license": "MIT",
     "bugs": {
         "url": "https://github.com/DesignLiquido/potigol/issues"
@@ -31,10 +31,10 @@
         "lodash": "^4.17.21"
     },
     "peerDependencies": {
-        "@designliquido/delegua": "^1.25.0"
+        "@designliquido/delegua": "^1.25.1"
     },
     "devDependencies": {
-        "@designliquido/delegua": "^1.25.0",
+        "@designliquido/delegua": "^1.25.1",
         "@types/estree": "^1.0.7",
         "@types/jest": "^30.0.0",
         "@types/node": "^26.0.0",
